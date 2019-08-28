@@ -10,6 +10,12 @@ import { EffectComposer } from './jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from './jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from './jsm/postprocessing/UnrealBloomPass.js';
 
+import { Dialog, DialogTitle, DialogContent, Button } from '@material-ui/core';
+
+interface ContentState {
+  isDialogOpen : boolean
+}
+
 interface BloomParam {
   exposure: number,
   bloomStrength: number,
@@ -23,6 +29,8 @@ let pointLight : THREE.PointLight;
 let renderer : THREE.WebGLRenderer;
 let camera : THREE.PerspectiveCamera;
 let composer : EffectComposer;
+let raycaster : THREE.Raycaster;
+let mouse : THREE.Vector2 = new THREE.Vector2(0,0);
 
 //color
 let rime : number = 0x00FF00;
@@ -37,10 +45,6 @@ let circleR = 100;
 let titlePad = (window.innerWidth <= 600) ? 150 : 75; //[Works/Activities]の文字分のパディング
 let pad = circleR + 50;
 
-
-//scroll
-let scrollY = 0;
-
 let params : BloomParam = {
   exposure: 1,
   bloomStrength: 2,
@@ -53,7 +57,14 @@ let LAYER = {
   BLOOM: 1
 };
 
-class Content extends React.Component {
+class Content extends React.Component<{}, ContentState> {
+  constructor() {
+    super({});
+    this.state = {isDialogOpen : false}
+    window.addEventListener('resize', this.onWindowResize, false);
+    window.addEventListener('mousemove', this.onMouseMove, false);
+    // this.handleDialogClose = this.handleDialogClose.bind(this);
+  }
   render() {
     return (
       <div id="content">
@@ -73,11 +84,30 @@ class Content extends React.Component {
               <Links />
             </div>
           </div>
+          <Dialog open={this.state.isDialogOpen} onClose={this.handleDialogClose}>
+            <DialogTitle>Work</DialogTitle>
+            <DialogContent>
+              <img src="texture/work0.png"></img>
+              <div>JavaScript始めたての頃に作った3時間ゲーム制作の作品です。素のHTMLCanvasです。</div>
+            </DialogContent>
+            <Button onClick={this.handleDialogClose} color="primary">Close</Button>
+          </Dialog>
         </div>
       </div>
     )
   }
-  componentDidMount() {
+  handleDialogClose = () => {
+    this.setState({
+      isDialogOpen : true
+    });
+  }
+  componentDidMount = () => {
+    this.setupCanvas();
+  }
+  componentDidUpdate = () => {
+    this.setupCanvas();
+  }
+  setupCanvas = () => {
     let defaultScrollY = window.scrollY;
     let boxes : HTMLElement[] = [];
     let box : HTMLElement | null;
@@ -144,8 +174,15 @@ class Content extends React.Component {
       w.push(new wonderLine(new THREE.Vector2(0, 0), rime));
     }
 
+    //Cube
+    // let cube : THREE.Mesh;
+    // {
+    //   let geo : THREE.BoxGeometry = new THREE.BoxGeometry(100, 100, 100);
+    //   let mat : THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial( {color: rime} );
+    //   cube = new THREE.Mesh(geo, mat);
+    // }
+
     const animate = () => {
-      scrollY = window.scrollY;
       scene = new THREE.Scene();
 
       let fov : number = 60;
@@ -153,7 +190,7 @@ class Content extends React.Component {
       let dist : number = (window.innerHeight/2) / Math.tan((fov/2)*Math.PI/180);
       camera = new THREE.PerspectiveCamera(fov, aspect, 0.1, 1000);
       camera.position.z = dist;
-      camera.position.y = -scrollY;
+      camera.position.y = -window.scrollY;
       scene.add(camera);
       
       scene.add( new THREE.AmbientLight(0x404040) );
@@ -180,7 +217,7 @@ class Content extends React.Component {
           if (mesh !== null) {
             scene.add(mesh);
           }
-          scene.add(frontCircle);
+          // scene.add(frontCircle);
         }
       }
 
@@ -191,6 +228,15 @@ class Content extends React.Component {
         }
       }
 
+      raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera( mouse, camera );
+      let intersects : THREE.Intersection[] | null = raycaster.intersectObjects(scene.children);
+      console.log(intersects.length);
+      // for (let intersect of intersects) {
+      //   intersect.object.scale.x = 3;
+      //   intersect.object.scale.y = 3;
+      // }
+
       //Post Process
       var renderScene = new RenderPass( scene, camera );
       var bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
@@ -200,7 +246,7 @@ class Content extends React.Component {
 
       composer = new EffectComposer( renderer );
       composer.addPass( renderScene );
-      composer.addPass( bloomPass );
+      // composer.addPass( bloomPass );
 
       requestAnimationFrame(animate);
 
@@ -212,12 +258,13 @@ class Content extends React.Component {
     }
 
     animate();
-
-    const onWindowResize = () => {
-      this.forceUpdate();
-    }
-
-    window.addEventListener('resize', onWindowResize, false);
+  }
+  onWindowResize = (e : UIEvent) => {
+    this.forceUpdate(() => (console.log('re render')));
+  }
+  onMouseMove = (e : MouseEvent) => {
+    mouse.x = e.clientX - window.innerWidth/2;
+    mouse.y = -e.clientY + window.innerHeight/2;
   }
 }
 
@@ -291,6 +338,7 @@ class Work {
   textureCircle : THREE.Mesh | undefined;
   backCircle : THREE.Line;
   frontCircle : THREE.Line;
+  backDiff : THREE.Vector3;
   position : THREE.Vector3 = new THREE.Vector3(0,0,0);
   constructor(src : string, radius : number, color: number) {
     //set texture circle
@@ -321,6 +369,7 @@ class Work {
       let mat : THREE.Material = new THREE.LineBasicMaterial( {color: color} );
       this.backCircle = new THREE.Line( geo, mat );
       this.backCircle.layers.set(LAYER.BLOOM);
+      this.backDiff = new THREE.Vector3(10*(Math.random()*2-1), 10*(Math.random()*2-1), -10);
     }
 
     //set front circle
@@ -335,7 +384,7 @@ class Work {
       let point2D : THREE.Vector2[] = arcGen.getPoints(60);
       let point3D : THREE.Vector3[] = [];
       for (let p of point2D) {
-        point3D.push(new THREE.Vector3(p.x, p.y, 5));
+        point3D.push(new THREE.Vector3(p.x, p.y, 0));
       }
       let geo : THREE.BufferGeometry = new THREE.BufferGeometry().setFromPoints(point3D);
       let mat : THREE.Material = new THREE.LineBasicMaterial( {color: color} );
@@ -354,9 +403,9 @@ class Work {
     }
   }
   getBackCircle() : THREE.Line {
-    this.backCircle.position.x = this.position.x;
-    this.backCircle.position.y = this.position.y;
-    this.backCircle.position.z = this.position.z;
+    this.backCircle.position.x = this.position.x + this.backDiff.x;
+    this.backCircle.position.y = this.position.y + this.backDiff.y;
+    this.backCircle.position.z = this.position.z + this.backDiff.z;
     return this.backCircle;
   }
   getFrontCircle() : THREE.Line {
