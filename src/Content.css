@@ -1,0 +1,31 @@
+.header {
+  text-align: left;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 60px;
+  color: #FFFFFF;
+  margin: 5%;
+}
+
+.body {
+  text-align: center;
+  margin: 20px;
+  padding: 20px;
+}
+
+.item {
+  margin-top: 40px;
+  padding: 20px;
+}
+
+#content {
+  position: relative;
+}
+
+.layer1 {
+  position: fixed;
+}
+
+.layer2 {
+  position: absolute;
+  width: 100%;
+}

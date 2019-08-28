@@ -1,0 +1,14 @@
+.text {
+  color: #FFFFFF;
+  text-align: left;
+}
+
+.title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 50px;
+  padding-left: 50px;
+}
+
+.detail {
+  font-family: "Sawarabi Gothic";
+}
