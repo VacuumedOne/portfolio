@@ -1,7 +1,7 @@
 import React from 'react';
 import './App.css';
 // import Text from './Text';
-import Loading from './Loading';
+// import Loading from './Loading';
 import Content from './Content';
 // import Background from './Background';
 

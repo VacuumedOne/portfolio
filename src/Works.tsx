@@ -1,11 +1,20 @@
 import React from 'react';
 import './Profile.css'
 
+interface WorksProps {
+  height : number
+}
+
 let worksStyle : React.CSSProperties = {
   height: '500px'
 }
 
-class Works extends React.Component {
+class Works extends React.Component<WorksProps, {}> {
+  constructor(props : WorksProps) {
+    super(props);
+    worksStyle.height = props.height;
+    console.log('height:' + props.height);
+  }
   render() {
     return (
       <div className="text">
