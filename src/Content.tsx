@@ -2,7 +2,9 @@ import React from 'react';
 import Profile from './Profile';
 import Works from './Works';
 import Links from './Links';
+import WorksDialog from './WorksDialog'
 import './Content.css';
+import AnimatedMeshLine from './AnimatedMeshLine';
 
 import * as THREE from 'three';
 
@@ -10,11 +12,14 @@ import { EffectComposer } from './jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from './jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from './jsm/postprocessing/UnrealBloomPass.js';
 
-import { Dialog, DialogTitle, DialogContent, Button } from '@material-ui/core';
-import { SpriteMaterial } from 'three';
+import { SpriteMaterial, Mesh } from 'three';
+
+let MeshLine : any = require('three.meshline').MeshLine;
+let MeshLineMaterial : any = require('three.meshline').MeshLineMaterial;
 
 interface ContentState {
   isDialogOpen : boolean,
+  dialogContent : number,
   workBoxHeight : number
 }
 
@@ -25,6 +30,12 @@ interface BloomParam {
   bloomRadius: number
 }
 
+
+///////////////////////////////
+// for updating parameter
+let workN : number = 5;
+///////////////////////////////
+
 let container : HTMLElement | null;
 let scene : THREE.Scene;
 // let pointLight : THREE.PointLight;
@@ -34,19 +45,29 @@ let composer : EffectComposer;
 let mouse : THREE.Vector3 = new THREE.Vector3(0,0,0);
 
 //color
-let rime : number = 0x00FF00;
+let palette : number[][] = [
+  [
+    0x45bf55,
+    0xb5e5bb,
+    0x00b496
+  ],
+  [
+    0x731229,
+    0x45bf55,
+    0x181273,
+  ]
+];
+
 
 //wonderLine
 let wNum : number = 5;
 let wonderStart : boolean = false;
 
 //works
-let workN : number = 3;
 let circleR : number = 100;
-let titlePad : number = (window.innerWidth <= 600) ? 250 : 175; //[Works/Activities]の文字分のパディング
+let titlePad : number = (window.innerWidth <= 600) ? 150 : 75; //[Works/Activities]の文字分のパディング
 let pad : number = circleR + 50;
 let step : number = 300;
-let workBoxHeight : number = 400;
 
 
 let params : BloomParam = {
@@ -64,7 +85,11 @@ let LAYER = {
 class Content extends React.Component<{}, ContentState> {
   constructor() {
     super({});
-    this.state = {isDialogOpen : false, workBoxHeight : 500}
+    this.state = {
+      isDialogOpen : false,
+      dialogContent : -1,
+      workBoxHeight : 500
+    }
     // this.handleDialogClose = this.handleDialogClose.bind(this);
   }
   render() {
@@ -79,21 +104,14 @@ class Content extends React.Component<{}, ContentState> {
             <div className="item" id="box1">
               <Profile />
             </div>
-            <div className="item" id="box2">
-              <Works height={this.state.workBoxHeight}/>
-            </div>
             <div className="item" id="box3">
               <Links />
             </div>
+            <div className="item" id="box2">
+              <Works height={this.state.workBoxHeight}/>
+            </div>
           </div>
-          <Dialog open={this.state.isDialogOpen} onClose={this.handleDialogClose}>
-            <DialogTitle>Work</DialogTitle>
-            <DialogContent>
-              <img src="texture/work0.png"></img>
-              <div>JavaScript始めたての頃に作った3時間ゲーム制作の作品です。素のHTMLCanvasです。</div>
-            </DialogContent>
-            <Button onClick={this.handleDialogClose} color="primary">Close</Button>
-          </Dialog>
+          <WorksDialog isDialogOpen={this.state.isDialogOpen} content={this.state.dialogContent} handleClose={this.handleDialogClose}/>
         </div>
       </div>
     )
@@ -102,6 +120,7 @@ class Content extends React.Component<{}, ContentState> {
     this.setState((prevState) => {
       return {
         isDialogOpen : false,
+        dialogContent : -1,
         workBoxHeight : prevState.workBoxHeight
       };
     });
@@ -109,9 +128,9 @@ class Content extends React.Component<{}, ContentState> {
   componentDidMount = () => {
     this.init();
   }
-  // componentDidUpdate = () => {
-  //   this.init();
-  // }
+  componentDidUpdate = () => {
+    // this.init();
+  }
   init = () => {
     let defaultScrollY = window.scrollY;
     let boxes : HTMLElement[] = [];
@@ -164,24 +183,26 @@ class Content extends React.Component<{}, ContentState> {
     }
 
     //Boxes
-    let boxM : THREE.LineBasicMaterial = new THREE.LineBasicMaterial( {color: rime, linewidth: 10}, );
+    let boxM : THREE.LineBasicMaterial = new THREE.LineBasicMaterial( {color: palette[0][0], linewidth: 10}, );
     let boxLines : THREE.Line[] = [];
-    for (let box of boxes) {
-      let rect : ClientRect | DOMRect = box.getBoundingClientRect();
-      let boxG : THREE.BufferGeometry = new THREE.BufferGeometry();
-      let vertices : Float32Array = new Float32Array([
-        rect.left, -rect.top, 0,
-        rect.right, -rect.top, 0,
-        rect.right, -rect.bottom, 0,
-        rect.left, -rect.bottom, 0,
-        rect.left, -rect.top, 0,
-      ]);
-      boxG.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
-      let line : THREE.Line = new THREE.Line(boxG, boxM);
-      line.position.x = -window.innerWidth/2;
-      line.position.y = window.innerHeight/2 - defaultScrollY;
-      line.layers.set(LAYER.PLANE);
-      boxLines.push(line);
+    {
+      for (let box of boxes) {
+        let rect : ClientRect | DOMRect = box.getBoundingClientRect();
+        let boxG : THREE.BufferGeometry = new THREE.BufferGeometry();
+        let vertices : Float32Array = new Float32Array([
+          rect.left, -rect.top, 0,
+          rect.right, -rect.top, 0,
+          rect.right, -rect.bottom, 0,
+          rect.left, -rect.bottom, 0,
+          rect.left, -rect.top, 0,
+        ]);
+        boxG.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        let line : THREE.Line = new THREE.Line(boxG, boxM);
+        line.position.x = -window.innerWidth/2;
+        line.position.y = window.innerHeight/2 - defaultScrollY;
+        line.layers.set(LAYER.PLANE);
+        boxLines.push(line);
+      }
     }
 
     //Works
@@ -197,44 +218,53 @@ class Content extends React.Component<{}, ContentState> {
     for(let i = 0; i < workN; i++) {
       let d : number = i * step;
       let dx : number = (d % range);
-      let dy : number = i * circleR + Math.floor(d / range) * circleR;
+      let dy : number = i * 2 * circleR + Math.floor(d / range) * circleR;
       let pos : THREE.Vector3 = new THREE.Vector3(origin.x + dx, origin.y - dy, 0);
-      works[i] = new Work('texture/work' + i + '.png', pos, circleR, rime);
+      works[i] = new Work('texture/work' + i + '.png', pos, circleR, palette[0][Math.floor(Math.random()*palette.length)]);
     }
     this.setState((prevState) => {
       return {
         isDialogOpen : prevState.isDialogOpen,
-        workBoxHeight : (workN-1) * circleR + Math.floor((workN-1) * step / range) * circleR + pad
+        workBoxHeight : (workN-1) * 2 * circleR + Math.floor((workN-1) * step / range) * circleR + circleR + pad
       };
     });
 
-    //wonder
-    // let w : wonderLine[] = [];
-    // for (let i = 0; i < wNum; i++) {
-    //   w.push(new wonderLine(new THREE.Vector2(0, 0), rime));
-    // }
-
-    // let spriteGroup : THREE.Group = new THREE.Group();
-    // let sprite1 : THREE.Sprite = new THREE.Sprite( new THREE.SpriteMaterial( {color: '#69f'} ));
-    // sprite1.scale.set(100, 100, 1);
-    // let sprite2 : THREE.Sprite = new THREE.Sprite( new THREE.SpriteMaterial( {color: '#69f'} ));
-    // sprite2.scale.set(200, 100, 1);
-    // sprite2.position.set(150, 150, 0);
-    // let g : THREE.Object3D = new THREE.Object3D();
-    // let sprite3 : THREE.Sprite = new THREE.Sprite( new THREE.SpriteMaterial( {color: '#69f'} ));
-    // sprite3.scale.set(50, 200, 1);
-    // sprite3.position.set(-150, -200, 0);
-    // spriteGroup.add(sprite1);
-    // spriteGroup.add(sprite2);
-    // g.add(sprite3);
-    // spriteGroup.add(g);
+    //MeshLine
+    let meshLines : AnimatedMeshLine[] = [];
+    let id = 0;
+    for (let box of boxes) {
+      let rect : DOMRect | ClientRect = box.getBoundingClientRect();
+      console.log(rect.top);
+      let points : THREE.Vector3[] = [];
+      let x = -1000;
+      let y = -rect.top - 70 + window.innerHeight/2 - window.scrollY;
+      while(x < rect.left - window.innerWidth/2) {
+        points.push(new THREE.Vector3(x, y, 0));
+        x += 200;
+      }
+      while(x < 1000) {
+        points.push(new THREE.Vector3(x, y, 0));
+        x += 200;
+      }
+      
+      meshLines.push(new AnimatedMeshLine(points, palette[1][id++], 0.01, 5, 3, 0.8));
+    }
+    // let points : THREE.Vector3[] = [];
+    // points.push(new THREE.Vector3(-1000, 0, 0));
+    // points.push(new THREE.Vector3(0, 0, 0));
+    // points.push(new THREE.Vector3(100, 100, 0));
+    // points.push(new THREE.Vector3(0, 200, 0));
+    // points.push(new THREE.Vector3(-100, 100, 0));
+    // points.push(new THREE.Vector3(0, 0, 0));
+    // points.push(new THREE.Vector3(1000, 0, 0));
+    // let meshLine = new AnimatedMeshLine(points, new THREE.Color(0xff0000));
 
     const animate = () => {
       scene = new THREE.Scene();
-      // scene.background = new THREE.Color(0x111111);
-      camera.position.x = mouse.x/20;
-      camera.position.y = mouse.y/20 - window.scrollY;
-      camera.lookAt(0, -window.scrollY, 0);
+      camera.position.y = -window.scrollY;
+      // camera.position.x = mouse.x/20;
+      // camera.position.y = mouse.y/20 - window.scrollY;
+      // camera.lookAt(0, -window.scrollY, 0);
 
       // scene.add(camera);
       
@@ -263,6 +293,11 @@ class Content extends React.Component<{}, ContentState> {
       scene.add(workGroup);
 
       // scene.add(spriteGroup);
+
+      for (let meshLine of meshLines) {
+        meshLine.update();
+        scene.add(meshLine.getMesh());
+      }
 
 
       //Post Process
@@ -315,72 +350,38 @@ class Content extends React.Component<{}, ContentState> {
       }
     }
     window.addEventListener('mousemove', onMouseMove, false);
+
+    const onClick = (e : MouseEvent) => {
+      if (!this.state.isDialogOpen) {
+        mouse.x = e.clientX - window.innerWidth/2;
+        mouse.y = -e.clientY + window.innerHeight/2;
+  
+        for (let i = 0; i < workN; i++) {
+          let work : Work | undefined = works[i];
+          if (work !== undefined) {
+            let dist = Math.sqrt(
+              Math.pow(work.position.x - mouse.x, 2.0) +
+              Math.pow(work.position.y - mouse.y + window.scrollY, 2.0)
+            ) - work.getRadius();
+            if (dist < 0) {
+              this.setState((prevState) => {
+                return {
+                  isDialogOpen : true,
+                  dialogContent : i,
+                  workBoxHeight : prevState.workBoxHeight
+                }
+              })
+            }
+          }
+        }
+      }
+    }
+    window.addEventListener('click', onClick, false);
   }
 }
 
-class wonderLine {
-  eps : number = 0.0001;
-  center : THREE.Vector2;
-  color : number;
-  theta: number;
-  r : number;
-  points : THREE.Vector3[] = [];
-  mvR : boolean;
-  dr : number = 0;
-  dtheta : number = 0;
-  rev : number = (Math.random() > 0.5)?-1:1;
-  alive: boolean = true;
-  constructor(center : THREE.Vector2, color: number) {
-    this.center = center;
-    this.color = color;
-    this.theta = Math.PI*2*Math.random();
-    this.r = 0;
-    this.points.push(new THREE.Vector3(this.center.x, this.center.y, 0));
-    this.mvR = true;
-    this.dr = 0.5 + Math.random();
-  }
-  update() : void {
-    if (!this.alive) {
-      return;
-    } else {
-      if (this.r > 50) {
-        this.alive = false;
-      }
-    }
-    if (this.mvR) {
-      if (this.dr <= this.eps) {
-        this.mvR = !this.mvR;
-        this.dtheta = Math.PI/8 + Math.PI*Math.random();
-      } else {
-        let d = Math.min(this.dr, 0.2);
-        this.dr -= d;
-        this.r += d;
-        this.points.push(new THREE.Vector3(
-          this.center.x + this.r*Math.cos(this.theta), 
-          this.center.y + this.r*Math.sin(this.theta), 
-          0));
-      }
-    } else {
-      if (this.dtheta <= this.eps) {
-        this.mvR = !this.mvR;
-        this.dr = 0.5 + Math.random();
-      } else {
-        let d = Math.min(this.dtheta, Math.PI/100 * this.r);
-        this.dtheta -= d;
-        this.theta += d*this.rev;
-        this.points.push(new THREE.Vector3(
-          this.center.x + this.r*Math.cos(this.theta), 
-          this.center.y + this.r*Math.sin(this.theta), 
-          0));
-      }
-    }
-  }
-  getLine() : THREE.Line {
-    let geometry : THREE.BufferGeometry = new THREE.BufferGeometry().setFromPoints(this.points);
-    let material : THREE.Material = new THREE.LineBasicMaterial( {color: this.color} );
-    let line : THREE.Line = new THREE.Line(geometry, material);
-    return line
-  }
+class BoldLine {
+
 }
 
 class Work {
@@ -388,9 +389,8 @@ class Work {
   static SCALE_MIN : number = 1;
   texture : THREE.Texture | undefined;
   textureCircle : THREE.Mesh | undefined;
-  backCircle : THREE.Line;
+  backCircle : THREE.Object3D;
   frontCircle : THREE.Object3D;
-  backDiff : THREE.Vector3;
   position : THREE.Vector3 = new THREE.Vector3(0,0,0);
   defaultRadius: number;
   scale_t : number = 0; //from 0, to 1
@@ -414,7 +414,7 @@ class Work {
       let arcGen : THREE.EllipseCurve = new THREE.EllipseCurve(
         0, 0,
         radius+30, radius+30,
-        0, Math.PI*2,
+        0, Math.PI/4,
         false,
         0
       );
@@ -423,12 +423,15 @@ class Work {
       for (let p of point2D) {
         point3D.push(new THREE.Vector3(p.x, p.y, -5));
       }
-      let geo : THREE.BufferGeometry = new THREE.BufferGeometry().setFromPoints(point3D);
-      let mat : THREE.Material = new THREE.LineBasicMaterial( {color: color} );
-      this.backCircle = new THREE.Line( geo, mat );
+      let meshLine = new AnimatedMeshLine(point3D, color, 0, 3, 0, 0);
+      let mesh : THREE.Mesh = meshLine.getMesh();
+      let mesh2 : THREE.Mesh = mesh.clone();
+      mesh2.rotateZ(Math.PI);
+      this.backCircle = new THREE.Object3D();
+      this.backCircle.add(mesh);
+      this.backCircle.add(mesh2);
+      this.backCircle.rotateZ(Math.random()*Math.PI);
       this.backCircle.layers.set(LAYER.PLANE);
-      // this.backDiff = new THREE.Vector3(10*(Math.random()*2-1), 10*(Math.random()*2-1), -10);
-      this.backDiff = new THREE.Vector3(0,0,0);
     }
 
     //set front circle
@@ -437,7 +440,7 @@ class Work {
       let arcGen : THREE.EllipseCurve = new THREE.EllipseCurve(
         0, 0,
         radius+10, radius+10,
-        0, 2*Math.PI,
+        0, Math.PI*2,
         false,
         0
       );
@@ -477,12 +480,12 @@ class Work {
       return null;
     }
   }
-  getBackCircle() : THREE.Line {
-    this.backCircle.position.x = this.position.x + this.backDiff.x;
-    this.backCircle.position.y = this.position.y + this.backDiff.y;
-    this.backCircle.position.z = this.position.z + this.backDiff.z+10;
-    this.backCircle.scale.x = this.getCircleScale();
-    this.backCircle.scale.y = this.getCircleScale();
+  getBackCircle() : THREE.Object3D {
+    this.backCircle.position.x = this.position.x;
+    this.backCircle.position.y = this.position.y;
+    this.backCircle.position.z = this.position.z + 10;
+    this.backCircle.scale.x = this.getCircleScale()*this.getCircleScale();
+    this.backCircle.scale.y = this.getCircleScale()*this.getCircleScale();
     return this.backCircle;
   }
   getFrontCircle() : THREE.Object3D {
@@ -531,7 +534,7 @@ class Work {
   }
   update() {
     this.frontCircle.rotateZ(Math.PI/2000);
-    this.backCircle.rotateZ(-Math.PI/100);
+    this.backCircle.rotateZ(-Math.PI/1000);
   }
 }
 
